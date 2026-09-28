@@ -195,8 +195,15 @@ void chacha20poly1305_encrypt(
 
   uint64_t le_nonce = htole64(nonce);
   uint8_t le_nonce_array[12];
+
   explicit_bzero(le_nonce_array, sizeof(le_nonce_array));
-  memcpy(le_nonce_array, &le_nonce, sizeof(uint64_t));
+
+  /* The 64-bit counter occupies the last 8 bytes of the 96-bit nonce, with
+   * the first 4 bytes left zero (RFC 8439 / WireGuard convention, matching
+   * wireguard-go's PutUint64(nonce[4:], counter)).
+   */
+
+  memcpy(le_nonce_array + 4, &le_nonce, sizeof(uint64_t));
 
   chacha_keysetup(&ctx, key, CHACHA20POLY1305_KEY_SIZE * 8);
   chacha_ivsetup(&ctx, le_nonce_array, NULL);
@@ -247,8 +254,15 @@ int chacha20poly1305_decrypt(
 
   uint64_t le_nonce = htole64(nonce);
   uint8_t le_nonce_array[12];
+
   explicit_bzero(le_nonce_array, sizeof(le_nonce_array));
-  memcpy(le_nonce_array, &le_nonce, sizeof(uint64_t));
+
+  /* The 64-bit counter occupies the last 8 bytes of the 96-bit nonce, with
+   * the first 4 bytes left zero (RFC 8439 / WireGuard convention, matching
+   * wireguard-go's PutUint64(nonce[4:], counter)).
+   */
+
+  memcpy(le_nonce_array + 4, &le_nonce, sizeof(uint64_t));
 
   if (src_len < CHACHA20POLY1305_AUTHTAG_SIZE)
     {
