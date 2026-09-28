@@ -200,6 +200,7 @@ static int get_ifindex(void)
   for (ndx = 0; ndx < MAX_IFINDEX; ndx++)
     {
       uint32_t bit = 1UL << ndx;
+
       if ((devset & bit) == 0)
         {
           /* Indicate that this index is in use */
@@ -364,11 +365,15 @@ int netdev_register(FAR struct net_driver_s *dev, enum net_lltype_e lltype)
             break;
 #endif
 
-#ifdef CONFIG_NET_TUN
+#if defined(CONFIG_NET_TUN) || defined(CONFIG_NET_WIREGUARD)
           case NET_LL_TUN:        /* Virtual Network Device (TUN) */
             llhdrlen = 0;         /* This will be overwritten by tun_ioctl
                                    * if used as a TAP (layer 2) device */
+#ifdef CONFIG_NET_TUN
             pktsize  = CONFIG_NET_TUN_PKTSIZE;
+#else
+            pktsize  = CONFIG_NET_WIREGUARD_PKTSIZE;
+#endif
             devfmt   = NETDEV_TUN_FORMAT;
             flags    = IFF_POINTOPOINT | IFF_NOARP | IFF_MULTICAST;
             break;

@@ -12,3 +12,4 @@ Network interface drivers
 
   ethernet.rst
   vlan.rst
+  wireguard.rst

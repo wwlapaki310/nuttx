@@ -38,6 +38,7 @@
 #include <nuttx/net/loopback.h>
 #include <nuttx/net/rpmsgdrv.h>
 #include <nuttx/net/tun.h>
+#include <nuttx/net/wireguard.h>
 #include <nuttx/net/telnet.h>
 #include <nuttx/note/note_driver.h>
 #include <nuttx/pci/pci.h>
@@ -240,6 +241,12 @@ void drivers_initialize(void)
   /* Initialize the TUN device */
 
   tun_initialize();
+#endif
+
+#ifdef CONFIG_NET_WIREGUARD
+  /* Initialize the WireGuard virtual network devices */
+
+  wireguard_initialize();
 #endif
 
 #ifdef CONFIG_NETDEV_TELNET

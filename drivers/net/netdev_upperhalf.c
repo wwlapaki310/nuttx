@@ -484,6 +484,16 @@ netdev_upper_vlan_foreach(FAR struct netdev_upperhalf_s *upper,
 {
   int i;
 
+  /* vlan_register only accepts Ethernet parents. In particular, a TUN
+   * device has no VLAN children and must not take g_netlock here while
+   * its protocol processing holds d_lock.
+   */
+
+  if (upper->lower->netdev.d_lltype != NET_LL_ETHERNET)
+    {
+      return;
+    }
+
   net_lock();
   for (i = 0; i < CONFIG_NET_VLAN_COUNT; i++)
     {
@@ -636,7 +646,7 @@ static void eth_input(FAR struct net_driver_s *dev)
  *
  ****************************************************************************/
 
-#ifdef CONFIG_NET_MBIM
+#if defined(CONFIG_NET_MBIM) || defined(CONFIG_NET_WIREGUARD)
 static void ip_input(FAR struct net_driver_s *dev)
 {
   /* We only accept IP packets of the configured type */
@@ -735,33 +745,38 @@ static void netdev_upper_rxpoll_work(FAR struct netdev_upperhalf_s *upper)
       switch (dev->d_lltype)
         {
 #ifdef CONFIG_NET_LOOPBACK
-        case NET_LL_LOOPBACK:
+          case NET_LL_LOOPBACK:
 #endif
 #ifdef CONFIG_NET_ETHERNET
-        case NET_LL_ETHERNET:
+          case NET_LL_ETHERNET:
 #endif
 #ifdef CONFIG_DRIVERS_IEEE80211
-        case NET_LL_IEEE80211:
+          case NET_LL_IEEE80211:
 #endif
 #if defined(CONFIG_NET_LOOPBACK) || defined(CONFIG_NET_ETHERNET) || \
     defined(CONFIG_DRIVERS_IEEE80211)
-          eth_input(dev);
-          break;
+            eth_input(dev);
+            break;
 #endif
 #ifdef CONFIG_NET_MBIM
-        case NET_LL_MBIM:
-          ip_input(dev);
-          break;
+          case NET_LL_MBIM:
+            ip_input(dev);
+            break;
+#endif
+#ifdef CONFIG_NET_WIREGUARD
+          case NET_LL_TUN:
+            ip_input(dev);
+            break;
 #endif
 #ifdef CONFIG_NET_CAN
-        case NET_LL_CAN:
-          ninfo("CAN frame");
-          can_input(dev);
-          break;
+          case NET_LL_CAN:
+            ninfo("CAN frame");
+            can_input(dev);
+            break;
 #endif
-        default:
-          nerr("Unknown link type %d\n", dev->d_lltype);
-          break;
+          default:
+            nerr("Unknown link type %d\n", dev->d_lltype);
+            break;
         }
     }
 
@@ -844,6 +859,7 @@ static inline void netdev_upper_queue_work(FAR struct net_driver_s *dev)
       case NETDEV_RX_WORK:
         {
           FAR struct work_s *work = upper->work;
+
           if (work_available(work))
             {
               /* Schedule to serialize the poll on the worker thread. */
@@ -1534,6 +1550,7 @@ void netdev_lower_carrier_on(FAR struct netdev_lowerhalf_s *dev)
 {
 #ifdef CONFIG_NET_VLAN
   FAR struct netdev_upperhalf_s *upper = dev->netdev.d_private;
+
   netdev_upper_vlan_foreach(upper, netdev_lower_carrier_on);
 #endif
 
@@ -1558,6 +1575,7 @@ void netdev_lower_carrier_off(FAR struct netdev_lowerhalf_s *dev)
 {
 #ifdef CONFIG_NET_VLAN
   FAR struct netdev_upperhalf_s *upper = dev->netdev.d_private;
+
   netdev_upper_vlan_foreach(upper, netdev_lower_carrier_off);
 #endif
 
@@ -1608,6 +1626,7 @@ void netdev_lower_txdone(FAR struct netdev_lowerhalf_s *dev)
 {
 #ifdef CONFIG_NET_VLAN
   FAR struct netdev_upperhalf_s *upper = dev->netdev.d_private;
+
   netdev_upper_vlan_foreach(upper, netdev_lower_txdone);
 #endif
   if (dev->rxtype == NETDEV_RX_DIRECT)
@@ -1871,6 +1890,7 @@ int netpkt_setdatalen(FAR struct netdev_lowerhalf_s *dev,
 {
   uint8_t llhdrlen = NET_LL_HDRLEN(&dev->netdev);
   int ret = iob_update_pktlen(pkt, len - llhdrlen, false);
+
   return ret >= 0 ? ret + llhdrlen : ret;
 }
 

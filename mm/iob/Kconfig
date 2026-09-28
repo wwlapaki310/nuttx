@@ -49,6 +49,7 @@ config IOB_SECTION
 
 config IOB_NCHAINS
 	int "Number of pre-allocated I/O buffer chain heads"
+	default IOB_NBUFFERS if NET_WIREGUARD
 	default 0 if !NET_READAHEAD
 	default IOB_NBUFFERS if NET_READAHEAD
 	---help---
