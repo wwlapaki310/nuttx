@@ -901,6 +901,15 @@ static const char *g_white_files[] =
   "gd32vw55x/gdwifi/gdwifi_glue.c",
   "gd32vw55x/gdwifi/gdwifi_newlib_compat.c",
   "gd32vw55x/gdble/gd32_ble.c",
+
+  /* Skip the third-party X25519 used by the wg command: it comes from the
+   * STROBE project under MIT, and the algorithm body keeps that project's
+   * formatting so it can be diffed against its source.
+   * Ref: apps/system/wg/wg_x25519.c
+   */
+
+  "system/wg/wg_x25519.c",
+  "system/wg/wg_x25519.h",
   NULL
 };
 
