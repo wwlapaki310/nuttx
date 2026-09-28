@@ -161,6 +161,14 @@
 #define SIOCGIFVLAN        _SIOC(0x0043)  /* Get VLAN interface */
 #define SIOCSIFVLAN        _SIOC(0x0044)  /* Set VLAN interface */
 
+/* WireGuard control (see include/nuttx/net/wireguard.h) ********************/
+
+#define SIOCSWGIF          _SIOC(0x0046)  /* Set WireGuard interface */
+#define SIOCGWGIF          _SIOC(0x0047)  /* Get WireGuard interface */
+#define SIOCSWGPEER        _SIOC(0x0048)  /* Add or update a peer */
+#define SIOCDWGPEER        _SIOC(0x0049)  /* Delete a peer */
+#define SIOCGWGPEER        _SIOC(0x004A)  /* Get a peer by index */
+
 /****************************************************************************
  * Public Type Definitions
  ****************************************************************************/

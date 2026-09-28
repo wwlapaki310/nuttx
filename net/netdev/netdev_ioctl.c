@@ -47,6 +47,7 @@
 #include <nuttx/net/netdev.h>
 #include <nuttx/net/radiodev.h>
 #include <nuttx/net/vlan.h>
+#include <nuttx/net/wireguard.h>
 
 #ifdef CONFIG_NET_6LOWPAN
 #  include <nuttx/net/sixlowpan.h>
@@ -703,6 +704,70 @@ static int netdev_vlan_ioctl(FAR struct socket *psock, int cmd,
     }
 
   return ret;
+}
+#endif
+
+/****************************************************************************
+ * Name: netdev_wireguard_ioctl
+ *
+ * Description:
+ *   Forward the WireGuard control ioctls to the named wgN device. Both
+ *   request structures start with the interface name, which is all this
+ *   function needs; the driver interprets the rest.
+ *
+ *   These commands are deliberately not registered with
+ *   net_ioctl_arglen(): a usrsock daemon forwards every command it knows
+ *   the length of to its own device, and would swallow requests meant for
+ *   wg0. Unknown commands fall through to the network driver instead.
+ *
+ * Input Parameters:
+ *   psock    Socket structure
+ *   cmd      The ioctl command
+ *   arg      The argument of the ioctl cmd
+ *
+ * Returned Value:
+ *   >=0 on success (positive non-zero values are cmd-specific)
+ *   Negated errno returned on failure.
+ *
+ ****************************************************************************/
+
+#if defined(CONFIG_NETDEV_IOCTL) && defined(CONFIG_NET_WIREGUARD)
+static int netdev_wireguard_ioctl(FAR struct socket *psock, int cmd,
+                                  unsigned long arg)
+{
+  FAR struct net_driver_s *dev;
+  FAR const char *ifname;
+  int ret = -ENOTTY;
+
+  switch (cmd)
+    {
+      case SIOCSWGIF:
+      case SIOCGWGIF:
+        ifname = ((FAR struct wg_ifreq_s *)(uintptr_t)arg)->ifname;
+        break;
+
+      case SIOCSWGPEER:
+      case SIOCDWGPEER:
+      case SIOCGWGPEER:
+        ifname = ((FAR struct wg_peerreq_s *)(uintptr_t)arg)->ifname;
+        break;
+
+      default:
+        return ret;
+    }
+
+  dev = netdev_findbyname(ifname);
+  if (dev == NULL)
+    {
+      return -ENODEV;
+    }
+
+  if (dev->d_ioctl == NULL)
+    {
+      return -ENOTTY;
+    }
+
+  return dev->d_ioctl(dev, cmd, arg);
 }
 #endif
 
@@ -2019,6 +2084,15 @@ int psock_vioctl(FAR struct socket *psock, int cmd, va_list ap)
     {
       ret = netdev_vlan_ioctl(psock, cmd,
                               (FAR struct vlan_ioctl_args *)(uintptr_t)arg);
+    }
+#endif
+
+#if defined(CONFIG_NETDEV_IOCTL) && defined(CONFIG_NET_WIREGUARD)
+  /* Check for a WireGuard command */
+
+  if (ret == -ENOTTY)
+    {
+      ret = netdev_wireguard_ioctl(psock, cmd, arg);
     }
 #endif
 
