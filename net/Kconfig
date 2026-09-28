@@ -312,6 +312,135 @@ config NET_VLAN_COUNT
 
 endif # NET_VLAN
 
+menuconfig NET_WIREGUARD
+	bool "WireGuard VPN virtual network device"
+	default n
+	depends on NET_UDP && NET_IPv4 && ALLOW_BSD_COMPONENTS
+	depends on CRYPTO && (CRYPTO_RANDOM_POOL || DEV_URANDOM_ARCH)
+	select ARCH_HAVE_NETDEV_STATISTICS
+	select NETDEV_IOCTL
+	select CRYPTO_CURVE25519
+	---help---
+		WireGuard VPN as a network device (wg0). Packets routed to wg0 are
+		encrypted and sent as UDP to the configured peer; packets received
+		on the UDP socket are decrypted and delivered as if they had
+		arrived on wg0. The peer can be any WireGuard implementation.
+
+		Keys and peers are set at run time through ioctls (see
+		include/nuttx/net/wireguard.h), normally with the wg command from
+		apps/system/wg. Nothing is baked into the image.
+
+		The protocol core is derived from wireguard-lwip (BSD-3-Clause),
+		hence ALLOW_BSD_COMPONENTS. The cryptography is NuttX's own
+		crypto/ (BLAKE2s, ChaCha20-Poly1305, Curve25519).
+
+		Key material needs a real random source: the entropy pool
+		(CRYPTO_RANDOM_POOL) or a hardware RNG behind /dev/urandom
+		(DEV_URANDOM_ARCH). The constant-seeded software PRNGs are not
+		accepted, since with them every device would generate the same
+		keys on every boot.
+
+		Initiator timestamps require CLOCK_REALTIME to be restored from
+		a reliable RTC or another external time source before use. The
+		driver prevents repeated/backward timestamps within one boot,
+		but does not persist them. A reset clock, or rollback across a
+		reboot, can prevent reconnection with the same key. A configured
+		start date alone does not meet this requirement.
+
+if NET_WIREGUARD
+
+config NET_WIREGUARD_NINTERFACES
+	int "Number of WireGuard interfaces"
+	default 1
+	range 1 4
+	---help---
+		How many wgN devices to create at start-up.
+
+config NET_WIREGUARD_MAX_PEERS
+	int "Maximum peers per interface"
+	default 1
+	range 1 16
+	---help---
+		Peers are allocated statically inside the device. Each costs
+		roughly 1 KiB plus three anti-replay windows
+		(3 * NET_WIREGUARD_REPLAY_WINDOW / 8 bytes).
+
+config NET_WIREGUARD_MAX_AIPS
+	int "Maximum allowed-ips entries per peer"
+	default 2
+	range 1 8
+	---help---
+		Destination prefixes routed to a peer (cryptokey routing).
+
+config NET_WIREGUARD_PKTSIZE
+	int "wg0 packet buffer size (MTU)"
+	default 1420
+	range 576 1500
+	---help---
+		Size of the IP packets carried inside the tunnel. 1420 leaves room
+		for the WireGuard, UDP and outer IPv4 headers within a 1500-byte
+		Ethernet frame.
+
+config NET_WIREGUARD_REPLAY_WINDOW
+	int "Anti-replay window (packets)"
+	default 2048
+	range 64 8192
+	---help---
+		Received data packets more than this many counters behind the
+		newest one seen are dropped. Must be a multiple of 64. Wi-Fi
+		retransmission reorders more than the 32 of the reference
+		implementation; Linux uses 8192.
+
+config NET_WIREGUARD_LOAD_THRESHOLD
+	int "Handshake initiations per second before cookies are required"
+	default 4
+	range 1 1000
+	---help---
+		Above this rate the device answers initiations that carry no valid
+		mac2 with a cookie reply instead of doing the Diffie-Hellman work
+		(WireGuard whitepaper 5.4.7).
+
+config NET_WIREGUARD_RXSTACKSIZE
+	int "Receive thread stack size"
+	default 6144
+	---help---
+		Stack of the kernel thread that receives UDP packets, decrypts
+		them and hands them to the network stack.
+
+config NET_WIREGUARD_RXPRIORITY
+	int "Receive thread priority"
+	default 100
+
+config NET_WIREGUARD_DEBUG_TAI64N
+	bool "Testing: log generated handshake timestamps"
+	default n
+	---help---
+		Log the generated TAI64N value before handshake encryption for
+		reboot/replay tests. Does not change the clock or log keys.
+		Never enable in a real build.
+
+config NET_WIREGUARD_DEBUG_STOP_STALL
+	bool "Testing: stall the RX thread once on stop"
+	default n
+	---help---
+		For tests only. Makes the first receive thread sleep past the
+		ifdown stop timeout, so the stopping-state recovery path (a later
+		ifdown/ifup reaping a thread that outlived the stop wait) can be
+		exercised deterministically. Never enable in a real build.
+
+config NET_WIREGUARD_DEBUG_TX_STALL
+	bool "Testing: stall with an owned outbound datagram"
+	default n
+	depends on DEBUG_ASSERTIONS
+	---help---
+		For tests only. Hold the first non-empty transport datagram outside
+		the device lock past the stop timeout. Check that its contents did
+		not change while other contexts ran. This exercises ownership and
+		stop recovery, not the actual usrsock backend. Never enable in a
+		real build.
+
+endif # NET_WIREGUARD
+
 config NETDEV_LATEINIT
 	bool "Late driver initialization"
 	default n
