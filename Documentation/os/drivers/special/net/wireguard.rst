@@ -124,8 +124,8 @@ socket, are:
   fills in the endpoint, allowed-ips, keepalive and the get-only
   statistics (last handshake, rx/tx bytes).
 
-These are normally driven by the ``wg`` command from ``apps/system/wg``
-rather than called directly.
+These are normally driven by the ``wg`` command
+(:doc:`/applications/system/wg/index`) rather than called directly.
 
 The private key and listen port may only be changed while the interface
 is down; peers and their endpoints may be changed at any time.
