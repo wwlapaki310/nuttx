@@ -484,6 +484,16 @@ netdev_upper_vlan_foreach(FAR struct netdev_upperhalf_s *upper,
 {
   int i;
 
+  /* vlan_register only accepts Ethernet parents. In particular, a TUN
+   * device has no VLAN children and must not take g_netlock here while
+   * its protocol processing holds d_lock.
+   */
+
+  if (upper->lower->netdev.d_lltype != NET_LL_ETHERNET)
+    {
+      return;
+    }
+
   net_lock();
   for (i = 0; i < CONFIG_NET_VLAN_COUNT; i++)
     {
@@ -636,7 +646,7 @@ static void eth_input(FAR struct net_driver_s *dev)
  *
  ****************************************************************************/
 
-#ifdef CONFIG_NET_MBIM
+#if defined(CONFIG_NET_MBIM) || defined(CONFIG_NET_WIREGUARD)
 static void ip_input(FAR struct net_driver_s *dev)
 {
   /* We only accept IP packets of the configured type */
@@ -750,6 +760,11 @@ static void netdev_upper_rxpoll_work(FAR struct netdev_upperhalf_s *upper)
 #endif
 #ifdef CONFIG_NET_MBIM
           case NET_LL_MBIM:
+            ip_input(dev);
+            break;
+#endif
+#ifdef CONFIG_NET_WIREGUARD
+          case NET_LL_TUN:
             ip_input(dev);
             break;
 #endif
